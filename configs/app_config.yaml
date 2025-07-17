@@ -1,0 +1,30 @@
+# RTSP Object Detection System Configuration
+# This file contains custom behavior settings not covered by DeepStream configs
+
+behavior:
+  static_threshold_seconds: 30
+  position_tolerance_pixels: 10
+  debounce_seconds: 2
+  min_confidence: 0.5
+
+events:
+  http:
+    endpoint: "http://api.example.com/events"
+    timeout_seconds: 5
+    retry_attempts: 3
+  mqtt:
+    broker: "mqtt.example.com"
+    topic: "detection/events"
+    port: 1883
+    qos: 1
+    # username: "mqtt_user"
+    # password: "mqtt_pass"
+
+frame_saving:
+  detection_only_mode: false
+  output_path: "/data/frames"
+  preserve_timestamps: true
+  max_frames_per_hour: 3600
+  image_format: "jpg"
+  image_quality: 95
+  min_confidence: 0.5

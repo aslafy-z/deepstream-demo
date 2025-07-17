@@ -1,0 +1,220 @@
+version: '3.8'
+
+services:
+  # RTSP Media Server for testing
+  mediamtx:
+    image: bluenviron/mediamtx:latest
+    container_name: rtsp-server-dev
+    ports:
+      - "8554:8554"  # RTSP port
+      - "8888:8888"  # Web UI port
+      - "8889:8889"  # HLS port
+      - "8890:8890"  # WebRTC port
+    environment:
+      - MTX_RTSPTRANSPORTS=tcp
+      - MTX_PATHSDEFAULTS_SOURCE=publisher
+      - MTX_WRITEQUEUESIZE=8388608
+      - MTX_WEBRTCADDITIONALHOSTS=0.0.0.0
+      - MTX_HLSALLOW=yes
+      - MTX_WEBRTCALLOW=yes
+    volumes:
+      - ./configs/mediamtx.yml:/mediamtx.yml:ro
+    networks:
+      - deepstream-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8888"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # FFmpeg stream publisher with multiple test streams
+  ffmpeg-publisher:
+    image: jrottenberg/ffmpeg:4.4-alpine
+    container_name: ffmpeg-publisher-dev
+    depends_on:
+      mediamtx:
+        condition: service_healthy
+    volumes:
+      - ./videos/input.mp4:/input.mp4:ro
+      - ./test-videos:/test-videos:ro
+    command: >
+      -re -stream_loop -1 -i /input.mp4
+      -c:v libx264 -preset ultrafast -tune zerolatency
+      -filter:v fps=15 -g 30 -keyint_min 30
+      -f rtsp -rtsp_transport tcp
+      rtsp://mediamtx:8554/live.stream
+    networks:
+      - deepstream-net
+    restart: unless-stopped
+
+  # Additional test stream with different content
+  ffmpeg-test-stream:
+    image: jrottenberg/ffmpeg:4.4-alpine
+    container_name: ffmpeg-test-stream
+    depends_on:
+      mediamtx:
+        condition: service_healthy
+    command: >
+      -f lavfi -i testsrc2=duration=3600:size=1280x720:rate=30
+      -f lavfi -i sine=frequency=1000:duration=3600
+      -c:v libx264 -preset ultrafast -tune zerolatency
+      -c:a aac -shortest
+      -f rtsp -rtsp_transport tcp
+      rtsp://mediamtx:8554/test.stream
+    networks:
+      - deepstream-net
+    restart: unless-stopped
+
+  # DeepStream Object Detection System
+  deepstream-app:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    container_name: deepstream-detection-dev
+    depends_on:
+      mediamtx:
+        condition: service_healthy
+      ffmpeg-publisher:
+        condition: service_started
+    ports:
+      - "8555:8554"  # RTSP output port
+      - "8080:8080"  # HTTP API port
+      - "9090:9090"  # Metrics port
+    volumes:
+      - ./models:/app/models:ro
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - ./configs:/app/configs
+      - ./src:/app/src  # Mount source for development
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility,video
+      - RTSP_INPUT_URI=rtsp://mediamtx:8554/live.stream
+      - LOG_LEVEL=DEBUG
+      - PYTHONPATH=/app/src
+    networks:
+      - deepstream-net
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+    command: >
+      python3 /app/src/pipeline_manager.py
+      --config /app/configs/deepstream_app_config.txt
+      --app-config /app/configs/app_config.yaml
+      --rtsp-uri rtsp://mediamtx:8554/live.stream
+      --log-level DEBUG
+      --json-logs
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import sys; sys.path.append('/app/src'); from config_manager import ConfigManager; print('OK')"]
+      interval: 60s
+      timeout: 30s
+      retries: 3
+      start_period: 120s
+
+  # MQTT Broker for event delivery testing
+  mqtt-broker:
+    image: eclipse-mosquitto:2.0
+    container_name: mqtt-broker-dev
+    ports:
+      - "1883:1883"
+      - "9001:9001"
+    volumes:
+      - ./configs/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - mqtt-data:/mosquitto/data
+      - mqtt-logs:/mosquitto/log
+    networks:
+      - deepstream-net
+    restart: unless-stopped
+
+  # HTTP Event Receiver for testing
+  event-receiver:
+    image: nginx:alpine
+    container_name: event-receiver-dev
+    ports:
+      - "8090:80"
+    volumes:
+      - ./configs/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./web:/usr/share/nginx/html:ro
+      - event-logs:/var/log/nginx
+    networks:
+      - deepstream-net
+    restart: unless-stopped
+
+  # Redis for caching and session management
+  redis:
+    image: redis:7-alpine
+    container_name: redis-dev
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - deepstream-net
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+
+  # Grafana for monitoring and visualization
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana-dev
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./configs/grafana:/etc/grafana/provisioning:ro
+    networks:
+      - deepstream-net
+    restart: unless-stopped
+
+  # Prometheus for metrics collection
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus-dev
+    ports:
+      - "9091:9090"
+    volumes:
+      - ./configs/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    networks:
+      - deepstream-net
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+
+networks:
+  deepstream-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+volumes:
+  models-data:
+    driver: local
+  frame-data:
+    driver: local
+  log-data:
+    driver: local
+  mqtt-data:
+    driver: local
+  mqtt-logs:
+    driver: local
+  event-logs:
+    driver: local
+  redis-data:
+    driver: local
+  grafana-data:
+    driver: local
+  prometheus-data:
+    driver: local

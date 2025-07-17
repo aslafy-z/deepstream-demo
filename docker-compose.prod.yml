@@ -1,0 +1,92 @@
+version: '3.8'
+
+services:
+  # DeepStream Object Detection System - Production
+  deepstream-app:
+    build: .
+    container_name: deepstream-detection-prod
+    ports:
+      - "8554:8554"  # RTSP output port
+      - "8080:8080"  # HTTP API port (if added later)
+    volumes:
+      - ./models:/app/models:ro
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - ./configs:/app/configs:ro
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility,video
+      - LOG_LEVEL=INFO
+      # Set your production RTSP URI here
+      - RTSP_INPUT_URI=${RTSP_INPUT_URI:-rtsp://your-camera-ip:554/stream}
+    networks:
+      - production-net
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+        limits:
+          memory: 4G
+      restart_policy:
+        condition: unless-stopped
+        delay: 10s
+        max_attempts: 3
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import sys; sys.path.append('/app/src'); from config_manager import ConfigManager; print('OK')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "5"
+
+  # Optional: MQTT Broker for event delivery
+  mqtt-broker:
+    image: eclipse-mosquitto:2.0
+    container_name: mqtt-broker-prod
+    ports:
+      - "1883:1883"
+      - "9001:9001"
+    volumes:
+      - ./mqtt/config:/mosquitto/config:ro
+      - ./mqtt/data:/mosquitto/data
+      - ./mqtt/log:/mosquitto/log
+    networks:
+      - production-net
+    restart: unless-stopped
+
+  # Optional: HTTP Event Receiver (example)
+  event-receiver:
+    image: nginx:alpine
+    container_name: event-receiver-prod
+    ports:
+      - "8090:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/html:/usr/share/nginx/html
+    networks:
+      - production-net
+    restart: unless-stopped
+
+networks:
+  production-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+volumes:
+  models-data:
+    driver: local
+  frame-data:
+    driver: local
+  log-data:
+    driver: local
+  mqtt-data:
+    driver: local

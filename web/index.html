@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RTSP Object Detection System - Dashboard</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        .card {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+        .status {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .status.online {
+            background-color: #4CAF50;
+            color: white;
+        }
+        .status.offline {
+            background-color: #f44336;
+            color: white;
+        }
+        .video-container {
+            position: relative;
+            width: 100%;
+            height: 300px;
+            background-color: #000;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        .video-placeholder {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: #666;
+            font-size: 18px;
+        }
+        .metrics {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+        .metric {
+            text-align: center;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 8px;
+        }
+        .metric-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #333;
+        }
+        .metric-label {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+        .links {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .link {
+            display: inline-block;
+            padding: 10px 15px;
+            background-color: #007bff;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            transition: background-color 0.3s;
+        }
+        .link:hover {
+            background-color: #0056b3;
+        }
+        .stream-label {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .status.unknown {
+            background-color: #ffc107;
+            color: #212529;
+        }
+        .event-item {
+            padding: 10px;
+            margin-bottom: 10px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+            border-left: 4px solid #007bff;
+        }
+        .event-time {
+            font-size: 11px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+        .event-type {
+            font-weight: bold;
+            color: #333;
+        }
+        .event-details {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>RTSP Object Detection System</h1>
+            <p>Real-time video analytics with AI-powered object detection</p>
+        </div>
+
+        <div class="grid">
+            <div class="card">
+                <h3>System Status</h3>
+                <div style="margin-bottom: 15px;">
+                    <strong>RTSP Server:</strong> <span class="status online" id="rtsp-status">Online</span>
+                </div>
+                <div style="margin-bottom: 15px;">
+                    <strong>DeepStream App:</strong> <span class="status online" id="deepstream-status">Online</span>
+                </div>
+                <div style="margin-bottom: 15px;">
+                    <strong>MQTT Broker:</strong> <span class="status online" id="mqtt-status">Online</span>
+                </div>
+                <div>
+                    <strong>Event Receiver:</strong> <span class="status online" id="events-status">Online</span>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3>Live Video Streams</h3>
+                <div class="video-container">
+                    <iframe 
+                        src="http://localhost:8888/live.stream/" 
+                        width="100%" 
+                        height="100%" 
+                        frameborder="0" 
+                        allowfullscreen
+                        title="Input Stream (HLS)">
+                    </iframe>
+                    <div class="stream-label">Input Stream (HLS)</div>
+                </div>
+                <div class="video-container" style="margin-top: 10px;">
+                    <iframe 
+                        src="http://localhost:8888/detection.stream/" 
+                        width="100%" 
+                        height="100%" 
+                        frameborder="0" 
+                        allowfullscreen
+                        title="Detection Output (HLS)">
+                    </iframe>
+                    <div class="stream-label">Detection Output (HLS)</div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3>Performance Metrics</h3>
+                <div class="metrics">
+                    <div class="metric">
+                        <div class="metric-value" id="fps">--</div>
+                        <div class="metric-label">FPS</div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric-value" id="objects">--</div>
+                        <div class="metric-label">Objects Detected</div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric-value" id="latency">--</div>
+                        <div class="metric-label">Latency (ms)</div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric-value" id="gpu-usage">--</div>
+                        <div class="metric-label">GPU Usage (%)</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3>Quick Links</h3>
+                <div class="links">
+                    <a href="http://localhost:8888" target="_blank" class="link">MediaMTX Web UI</a>
+                    <a href="http://localhost:3000" target="_blank" class="link">Grafana Dashboard</a>
+                    <a href="http://localhost:9091" target="_blank" class="link">Prometheus Metrics</a>
+                    <a href="http://localhost:8080/health" target="_blank" class="link">API Health Check</a>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3>Recent Events</h3>
+                <div id="events-list">
+                    <p style="color: #666; font-style: italic;">No recent events</p>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3>Configuration</h3>
+                <div style="font-family: monospace; font-size: 12px; background-color: #f8f9fa; padding: 15px; border-radius: 5px;">
+                    <strong>Input Stream:</strong> rtsp://localhost:8554/live.stream<br>
+                    <strong>Output Stream:</strong> rtsp://localhost:8555/detection.stream<br>
+                    <strong>MQTT Topic:</strong> detection/events<br>
+                    <strong>HTTP Endpoint:</strong> http://localhost:8090/events<br>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // API base URL
+        const API_BASE = 'http://localhost:8080/api';
+        
+        // Update system status from API
+        async function updateStatus() {
+            try {
+                const response = await fetch(`${API_BASE}/status`);
+                if (response.ok) {
+                    const data = await response.json();
+                    
+                    // Update status indicators
+                    updateStatusElement('rtsp-status', data.rtsp_server);
+                    updateStatusElement('deepstream-status', data.deepstream_app);
+                    updateStatusElement('mqtt-status', data.mqtt_broker);
+                    updateStatusElement('events-status', data.event_receiver);
+                } else {
+                    console.error('Failed to fetch status:', response.status);
+                    setAllStatusUnknown();
+                }
+            } catch (error) {
+                console.error('Error fetching status:', error);
+                setAllStatusUnknown();
+            }
+        }
+
+        // Update performance metrics from API
+        async function updateMetrics() {
+            try {
+                const response = await fetch(`${API_BASE}/metrics`);
+                if (response.ok) {
+                    const data = await response.json();
+                    
+                    // Update metric displays
+                    document.getElementById('fps').textContent = data.fps || '--';
+                    document.getElementById('objects').textContent = data.objects_detected || '--';
+                    document.getElementById('latency').textContent = data.latency_ms || '--';
+                    document.getElementById('gpu-usage').textContent = data.gpu_usage || '--';
+                } else {
+                    console.error('Failed to fetch metrics:', response.status);
+                    setAllMetricsUnknown();
+                }
+            } catch (error) {
+                console.error('Error fetching metrics:', error);
+                setAllMetricsUnknown();
+            }
+        }
+
+        // Update recent events from API
+        async function updateEvents() {
+            try {
+                const response = await fetch(`${API_BASE}/events`);
+                if (response.ok) {
+                    const data = await response.json();
+                    const eventsContainer = document.getElementById('events-list');
+                    
+                    if (data.events && data.events.length > 0) {
+                        eventsContainer.innerHTML = data.events.map(event => `
+                            <div class="event-item">
+                                <div class="event-time">${formatTimestamp(event.timestamp)}</div>
+                                <div class="event-type">${event.event_type || 'Unknown Event'}</div>
+                                <div class="event-details">
+                                    ${event.object ? `Object: ${event.object.class_name || 'Unknown'} (ID: ${event.object.tracking_id || 'N/A'})` : ''}
+                                    ${event.metadata ? `Duration: ${event.metadata.duration || 'N/A'}s` : ''}
+                                </div>
+                            </div>
+                        `).join('');
+                    } else {
+                        eventsContainer.innerHTML = '<p style="color: #666; font-style: italic;">No recent events</p>';
+                    }
+                } else {
+                    console.error('Failed to fetch events:', response.status);
+                }
+            } catch (error) {
+                console.error('Error fetching events:', error);
+            }
+        }
+
+        // Update configuration from API
+        async function updateConfig() {
+            try {
+                const response = await fetch(`${API_BASE}/config`);
+                if (response.ok) {
+                    const data = await response.json();
+                    const configContainer = document.querySelector('.card:last-child > div:last-child');
+                    
+                    configContainer.innerHTML = `
+                        <strong>Input Stream:</strong> ${data.input_stream || 'N/A'}<br>
+                        <strong>Output Stream:</strong> ${data.output_stream || 'N/A'}<br>
+                        <strong>MQTT Topic:</strong> ${data.mqtt_topic || 'N/A'}<br>
+                        <strong>HTTP Endpoint:</strong> ${data.http_endpoint || 'N/A'}<br>
+                    `;
+                }
+            } catch (error) {
+                console.error('Error fetching config:', error);
+            }
+        }
+
+        // Helper function to update status elements
+        function updateStatusElement(elementId, status) {
+            const element = document.getElementById(elementId);
+            if (element) {
+                element.className = `status ${status}`;
+                element.textContent = status.charAt(0).toUpperCase() + status.slice(1);
+            }
+        }
+
+        // Helper function to set all status to unknown
+        function setAllStatusUnknown() {
+            ['rtsp-status', 'deepstream-status', 'mqtt-status', 'events-status'].forEach(id => {
+                updateStatusElement(id, 'unknown');
+            });
+        }
+
+        // Helper function to set all metrics to unknown
+        function setAllMetricsUnknown() {
+            ['fps', 'objects', 'latency', 'gpu-usage'].forEach(id => {
+                document.getElementById(id).textContent = '--';
+            });
+        }
+
+        // Helper function to format timestamp
+        function formatTimestamp(timestamp) {
+            try {
+                const date = new Date(timestamp);
+                return date.toLocaleString();
+            } catch (error) {
+                return timestamp;
+            }
+        }
+
+        // Update functions at different intervals
+        setInterval(updateMetrics, 3000);    // Update metrics every 3 seconds
+        setInterval(updateStatus, 10000);    // Update status every 10 seconds
+        setInterval(updateEvents, 5000);     // Update events every 5 seconds
+        setInterval(updateConfig, 30000);    // Update config every 30 seconds
+
+        // Initial updates
+        updateMetrics();
+        updateStatus();
+        updateEvents();
+        updateConfig();
+    </script>
+</body>
+</html>

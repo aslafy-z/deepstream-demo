@@ -1,0 +1,78 @@
+version: '3.8'
+
+services:
+  # RTSP Media Server for testing
+  mediamtx:
+    image: bluenviron/mediamtx:latest
+    container_name: rtsp-server
+    ports:
+      - "8554:8554"  # RTSP port
+      - "8888:8888"  # HLS/Web UI port
+      - "8889:8889"  # WebRTC port
+      - "9997:9997"  # API port
+      - "9998:9998"  # Metrics port
+    volumes:
+      - ./configs/mediamtx.yml:/mediamtx.yml:ro
+    networks:
+      - deepstream-net
+    restart: unless-stopped
+
+  # FFmpeg stream publisher for testing
+  ffmpeg-publisher:
+    image: jrottenberg/ffmpeg:4.4-alpine
+    container_name: ffmpeg-publisher
+    depends_on:
+      - mediamtx
+    volumes:
+      - ./videos/input.mp4:/input.mp4:ro
+    command: >
+      -re -stream_loop -1 -i /input.mp4
+      -c:v libx264 -filter:v fps=8
+      -g 1 -keyint_min 1 -f rtsp -rtsp_transport tcp
+      rtsp://mediamtx:8554/live.stream
+    networks:
+      - deepstream-net
+    restart: unless-stopped
+
+  # DeepStream Object Detection System
+  deepstream-app:
+    build: .
+    container_name: deepstream-detection
+    depends_on:
+      - mediamtx
+      - ffmpeg-publisher
+    ports:
+      - "8555:8554"  # RTSP output port (mapped to avoid conflict)
+      - "8080:8080"  # HTTP API port (if added later)
+    volumes:
+      - ./models:/app/models:ro
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - ./configs:/app/configs
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility,video
+      - RTSP_INPUT_URI=rtsp://mediamtx:8554/live.stream
+    networks:
+      - deepstream-net
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+    command: >
+      python3 /app/src/pipeline_manager.py
+      /app/configs/deepstream_app_config.txt
+      /app/configs/app_config.yaml
+
+networks:
+  deepstream-net:
+    driver: bridge
+
+volumes:
+  models-data:
+  frame-data:
+  log-data:

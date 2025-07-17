@@ -1,0 +1,97 @@
+# MediaMTX Configuration for RTSP Object Detection System
+
+# General settings
+logLevel: info
+logDestinations: [stdout]
+logFile: ""
+
+# API settings
+api: yes
+apiAddress: :9997
+
+# Metrics settings
+metrics: yes
+metricsAddress: :9998
+
+# RTSP settings
+rtspDisable: no
+protocols: [tcp]
+encryption: "no"
+rtspAddress: :8554
+rtspsAddress: :8555
+rtpAddress: :8000
+rtcpAddress: :8001
+multicastIPRange: 224.1.0.0/16
+multicastRTPPort: 8002
+multicastRTCPPort: 8003
+
+# HLS settings
+hlsDisable: no
+hlsAddress: :8888
+hlsEncryption: no
+hlsServerKey: ""
+hlsServerCert: ""
+hlsAllowOrigin: "*"
+hlsVariant: lowLatency
+hlsSegmentCount: 7
+hlsSegmentDuration: 1s
+hlsPartDuration: 200ms
+hlsSegmentMaxSize: 50M
+hlsDirectory: ""
+
+# WebRTC settings
+webrtcDisable: no
+webrtcAddress: :8889
+webrtcEncryption: no
+webrtcServerKey: ""
+webrtcServerCert: ""
+webrtcAllowOrigin: "*"
+webrtcTrustedProxies: []
+webrtcICEServers2: []
+
+# Path settings
+pathDefaults:
+  source: publisher
+  sourceProtocol: automatic
+  sourceAnyPortEnable: no
+  sourceFingerprint: ""
+  sourceOnDemand: no
+  sourceOnDemandStartTimeout: 10s
+  sourceOnDemandCloseAfter: 10s
+  sourceRedirect: ""
+  disablePublisherOverride: no
+  fallback: ""
+  
+  # Publisher settings
+  publishUser: ""
+  publishPass: ""
+  publishIPs: []
+  
+  # Reader settings
+  readUser: ""
+  readPass: ""
+  readIPs: []
+  
+  # Recording settings
+  record: no
+  recordPath: "./recordings/%path/%Y-%m-%d_%H-%M-%S-%f"
+  recordFormat: mp4
+  recordPartDuration: 1h
+  recordSegmentDuration: 1h
+  recordDeleteAfter: 24h
+
+# Specific paths
+paths:
+  # Live stream from FFmpeg
+  live.stream:
+    source: publisher
+    
+  # Test pattern stream
+  test.stream:
+    source: publisher
+    
+  # Detection output stream
+  detection.stream:
+    source: publisher
+    record: yes
+    recordPath: "./recordings/detection_%Y-%m-%d_%H-%M-%S"

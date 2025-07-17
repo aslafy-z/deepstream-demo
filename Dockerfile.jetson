@@ -1,0 +1,73 @@
+# RTSP Object Detection System - DeepStream Container for NVIDIA Jetson
+# Optimized for Jetson Nano, Xavier NX, Xavier AGX, and Orin devices
+
+# Use NVIDIA L4T DeepStream base image for Jetson
+FROM nvcr.io/nvidia/deepstream-l4t:6.4-devel
+
+# Set environment variables
+ENV DEBIAN_FRONTEND=noninteractive
+ENV PYTHONUNBUFFERED=1
+ENV CUDA_DEVICE_ORDER=PCI_BUS_ID
+
+# Install system dependencies (lighter for Jetson)
+RUN apt-get update && apt-get install -y \
+    python3 \
+    python3-pip \
+    python3-dev \
+    python3-gi \
+    python3-gi-cairo \
+    gir1.2-gstreamer-1.0 \
+    gir1.2-gst-plugins-base-1.0 \
+    gstreamer1.0-plugins-good \
+    gstreamer1.0-plugins-bad \
+    gstreamer1.0-plugins-ugly \
+    gstreamer1.0-libav \
+    gstreamer1.0-tools \
+    libgstreamer1.0-dev \
+    libgstreamer-plugins-base1.0-dev \
+    libglib2.0-dev \
+    libgstrtspserver-1.0-dev \
+    libgirepository1.0-dev \
+    pkg-config \
+    git \
+    wget \
+    curl \
+    vim \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python dependencies with optimizations for ARM
+COPY requirements.txt /tmp/requirements.txt
+RUN pip3 install --no-cache-dir --prefer-binary -r /tmp/requirements.txt
+
+# Create application directory
+WORKDIR /app
+
+# Copy application source code
+COPY src/ /app/src/
+COPY configs/ /app/configs/
+COPY tests/ /app/tests/
+
+# Create directories for data and models
+RUN mkdir -p /app/models /app/data/frames /app/logs
+
+# Set up DeepStream Python bindings path for L4T
+ENV PYTHONPATH="${PYTHONPATH}:/opt/nvidia/deepstream/deepstream/lib"
+
+# Jetson-specific optimizations
+ENV CUDA_CACHE_DISABLE=0
+ENV CUDA_CACHE_MAXSIZE=2147483648
+
+# Create non-root user for security
+RUN groupadd -r deepstream && useradd -r -g deepstream deepstream
+RUN chown -R deepstream:deepstream /app
+USER deepstream
+
+# Expose ports
+EXPOSE 8554 8555 1883
+
+# Health check (lighter for Jetson)
+HEALTHCHECK --interval=60s --timeout=15s --start-period=120s --retries=2 \
+    CMD python3 -c "import sys; print('OK')" || exit 1
+
+# Default command
+CMD ["python3", "/app/src/pipeline_manager.py", "/app/configs/deepstream_app_config.txt", "/app/configs/app_config.yaml"]
