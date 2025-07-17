@@ -335,7 +335,7 @@ The system supports hot-reloading of configuration files. Simply modify `configs
 
 ## License
 
-[License information]
+[MIT](./LICENSE)
 
 ## Support
 
