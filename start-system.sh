@@ -48,7 +48,7 @@ check_prerequisites() {
     fi
     
     # Check Docker Compose
-    if ! command -v docker-compose &> /dev/null; then
+    if ! docker compose version >/dev/null 2>&1; then
         print_error "Docker Compose is not installed. Please install Docker Compose first."
         exit 1
     fi
