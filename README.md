@@ -82,7 +82,7 @@ cd rtsp-object-detection-system
 ./build.sh build auto
 
 # Start full stack
-docker-compose up -d
+docker compose up -d
 
 # View logs
 ./build.sh logs
@@ -225,7 +225,7 @@ python tests/test_config_manager.py
 
 ```bash
 # Production deployment
-docker-compose -f docker-compose.prod.yml up -d
+docker compose -f docker-compose.prod.yml up -d
 ```
 
 ## Monitoring
@@ -246,8 +246,8 @@ docker ps --format "table {{.Names}}\t{{.Status}}"
 ./build.sh logs
 
 # Specific component logs
-docker-compose logs deepstream-app
-docker-compose logs mediamtx
+docker compose logs deepstream-app
+docker compose logs mediamtx
 ```
 
 ### Performance Monitoring

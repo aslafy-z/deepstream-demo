@@ -154,7 +154,7 @@ def test_docker_compose():
     print("✅ docker-compose.yml found")
     
     # Test compose file syntax
-    success, stdout, stderr = run_command("docker-compose config")
+    success, stdout, stderr = run_command("docker compose config")
     if not success:
         print(f"❌ Docker Compose configuration invalid: {stderr}")
         return False

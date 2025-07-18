@@ -116,7 +116,7 @@ run_container() {
     # Run with Docker Compose for full stack
     if [ -f "docker-compose.yml" ]; then
         print_status "Using Docker Compose for full stack deployment..."
-        docker-compose up -d
+        docker compose up -d
         print_success "Full stack started. Access RTSP server web UI at http://localhost:8888"
     else
         # Run standalone container
@@ -136,7 +136,7 @@ stop_containers() {
     print_status "Stopping containers..."
     
     if [ -f "docker-compose.yml" ]; then
-        docker-compose down
+        docker compose down
     fi
     
     # Stop any running deepstream containers
@@ -185,7 +185,7 @@ show_usage() {
 # Show logs
 show_logs() {
     if [ -f "docker-compose.yml" ]; then
-        docker-compose logs -f deepstream-app
+        docker compose logs -f deepstream-app
     else
         docker logs -f $(docker ps -q --filter "ancestor=deepstream-detection" | head -1) 2>/dev/null || \
         docker logs -f $(docker ps -q --filter "ancestor=deepstream-detection-jetson" | head -1) 2>/dev/null || \

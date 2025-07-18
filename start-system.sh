@@ -100,15 +100,15 @@ start_system() {
     
     # Pull latest images
     print_status "Pulling latest Docker images..."
-    docker-compose -f $compose_file pull
+    docker compose -f $compose_file pull
     
     # Build custom images
     print_status "Building custom images..."
-    docker-compose -f $compose_file build
+    docker compose -f $compose_file build
     
     # Start services
     print_status "Starting services..."
-    docker-compose -f $compose_file up -d
+    docker compose -f $compose_file up -d
     
     # Wait for services to be ready
     print_status "Waiting for services to start..."
@@ -125,10 +125,10 @@ check_services_health() {
     print_status "Checking service health..."
     
     # Get running containers
-    local containers=$(docker-compose -f $compose_file ps --services)
+    local containers=$(docker compose -f $compose_file ps --services)
     
     for service in $containers; do
-        local container_name=$(docker-compose -f $compose_file ps -q $service)
+        local container_name=$(docker compose -f $compose_file ps -q $service)
         if [ -n "$container_name" ]; then
             local status=$(docker inspect --format='{{.State.Status}}' $container_name 2>/dev/null || echo "not found")
             if [ "$status" = "running" ]; then
@@ -172,13 +172,13 @@ show_system_info() {
     
     echo -e "${CYAN}Management Commands:${NC}"
     echo "  # View logs:"
-    echo "  docker-compose logs -f deepstream-app"
+    echo "  docker compose logs -f deepstream-app"
     echo ""
     echo "  # Stop system:"
-    echo "  docker-compose down"
+    echo "  docker compose down"
     echo ""
     echo "  # Restart specific service:"
-    echo "  docker-compose restart deepstream-app"
+    echo "  docker compose restart deepstream-app"
     echo ""
 }
 
@@ -188,7 +188,7 @@ show_logs() {
     local compose_file=${2:-docker-compose.yml}
     
     print_status "Showing logs for $service..."
-    docker-compose -f $compose_file logs -f $service
+    docker compose -f $compose_file logs -f $service
 }
 
 # Stop the system
@@ -196,7 +196,7 @@ stop_system() {
     local compose_file=${1:-docker-compose.yml}
     
     print_header "Stopping RTSP Object Detection System"
-    docker-compose -f $compose_file down
+    docker compose -f $compose_file down
     print_success "System stopped"
 }
 
@@ -207,7 +207,7 @@ cleanup_system() {
     print_header "Cleaning up RTSP Object Detection System"
     
     # Stop and remove containers
-    docker-compose -f $compose_file down -v --remove-orphans
+    docker compose -f $compose_file down -v --remove-orphans
     
     # Remove custom images
     docker rmi $(docker images | grep deepstream-detection | awk '{print $3}') 2>/dev/null || true
