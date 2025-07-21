@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # DeepStream Object Detection System - Production
   deepstream-app:

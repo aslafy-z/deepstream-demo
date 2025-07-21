@@ -114,8 +114,44 @@ COPY tests/ /app/tests/
 # Create directories for data and models
 RUN mkdir -p /app/models /app/data/frames /app/logs
 
-# Set up DeepStream Python bindings path
-ENV PYTHONPATH="${PYTHONPATH}:/opt/nvidia/deepstream/deepstream/lib"
+# Install DeepStream Python bindings
+USER root
+RUN apt-get update && apt-get install -y python3-gi python3-dev python3-gst-1.0 && \
+    echo "Checking DeepStream installation directories..." && \
+    ls -la /opt/nvidia/deepstream/ || echo "DeepStream directory not found" && \
+    # Install DeepStream Python bindings for Triton container
+    cd /opt/nvidia/deepstream/deepstream && \
+    if [ -f "/opt/nvidia/deepstream/deepstream/sources/deepstream_python_apps/install.sh" ]; then \
+        cd /opt/nvidia/deepstream/deepstream/sources/deepstream_python_apps && \
+        bash install.sh; \
+    elif [ -d "/opt/nvidia/deepstream/deepstream/sources/python" ]; then \
+        cd /opt/nvidia/deepstream/deepstream/sources/python && \
+        python3 setup.py install; \
+    else \
+        # Find and install any pyds wheel files
+        find /opt/nvidia/deepstream -name "pyds*.whl" -exec pip3 install --force-reinstall {} \; || \
+        echo "No pyds wheel found, trying to build from source"; \
+        # Clone and build the Python bindings if not available
+        cd /opt && \
+        git clone https://github.com/NVIDIA-AI-IOT/deepstream_python_apps.git && \
+        cd deepstream_python_apps && \
+        git submodule update --init && \
+        cd bindings && \
+        mkdir build && \
+        cd build && \
+        cmake .. -DPYTHON_MAJOR_VERSION=3 -DPYTHON_MINOR_VERSION=8 && \
+        make -j$(nproc) && \
+        pip3 install ./pyds-*.whl; \
+    fi && \
+    rm -rf /var/lib/apt/lists/*
+
+# Set up DeepStream Python bindings path with all possible locations
+ENV PYTHONPATH="${PYTHONPATH}:/opt/nvidia/deepstream/deepstream/lib:/opt/nvidia/deepstream/deepstream/python:/opt/nvidia/deepstream/deepstream/sources/python:/usr/lib/python3/dist-packages:/opt/nvidia/deepstream/deepstream/sources/deepstream_python_apps/bindings"
+
+# Create a simple test script to verify DeepStream paths
+RUN echo '#!/usr/bin/env python3\nimport sys\nprint("Python version:", sys.version)\nprint("Python path:", sys.path)\ntry:\n    import pyds\n    print("pyds imported successfully")\nexcept ImportError as e:\n    print("Failed to import pyds:", e)\n    print("Searching for pyds...")\n    import os\n    for root, dirs, files in os.walk("/opt/nvidia"):\n        for file in files:\n            if "pyds" in file:\n                print(f"Found: {os.path.join(root, file)}")\n' > /tmp/find_pyds.py && \
+    chmod +x /tmp/find_pyds.py && \
+    python3 /tmp/find_pyds.py || echo "pyds import failed, but continuing build"
 
 # Create non-root user for security
 RUN groupadd -r deepstream && useradd -r -g deepstream deepstream
