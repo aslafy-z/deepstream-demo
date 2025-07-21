@@ -2,7 +2,7 @@
 # Based on NVIDIA DeepStream SDK with GPU support
 
 # Use NVIDIA DeepStream base image with Ubuntu 20.04
-FROM nvcr.io/nvidia/deepstream:6.4-devel AS base
+FROM nvcr.io/nvidia/deepstream:6.4-gc-triton-devel AS base
 
 # Set environment variables
 ENV DEBIAN_FRONTEND=noninteractive
