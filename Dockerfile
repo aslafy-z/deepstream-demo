@@ -100,7 +100,8 @@ RUN gst-inspect-1.0 kvssink
 
 # Install Python dependencies
 COPY requirements.txt /tmp/requirements.txt
-RUN pip3 install --no-cache-dir -r /tmp/requirements.txt
+# Use --ignore-installed to handle distutils installed packages like blinker
+RUN pip3 install --no-cache-dir --ignore-installed -r /tmp/requirements.txt
 
 # Create application directory
 WORKDIR /app
